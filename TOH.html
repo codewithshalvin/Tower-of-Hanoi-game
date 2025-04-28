@@ -345,6 +345,43 @@
                 font-size: 1.8rem;
             }
         }
+
+        /* New style for invalid moves */
+        .tower.invalid {
+            animation: shake 0.5s;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-5px); }
+            40%, 80% { transform: translateX(5px); }
+        }
+
+        /* Help box styles */
+        .help-box {
+            background-color: rgba(0, 0, 0, 0.7);
+            border: 1px solid #b89b4a;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+            width: 90%;
+            max-width: 800px;
+            font-size: 16px;
+        }
+
+        .help-box h3 {
+            color: #b89b4a;
+            margin-top: 0;
+        }
+
+        .help-box ul {
+            text-align: left;
+            padding-left: 20px;
+        }
+
+        .help-box li {
+            margin-bottom: 8px;
+        }
     </style>
 </head>
 <body>
@@ -402,6 +439,17 @@
         </div>
     </div>
 
+    <div class="help-box">
+        <h3>Rules:</h3>
+        <ul>
+            <li>The objective is to move the entire stack of disks from Tower A to Tower C.</li>
+            <li>Only one disk can be moved at a time.</li>
+            <li>Only the top disk from any tower can be removed.</li>
+            <li>No disk may be placed on top of a smaller disk.</li>
+            <li>Try to complete the puzzle in the minimum number of moves!</li>
+        </ul>
+    </div>
+
     <div class="win-message" id="win-message">
         Perfect! Completed in minimum moves!
     </div>
@@ -437,175 +485,183 @@
         const winMessage = document.getElementById('win-message');
         
     
-        function initializeGame() {
-            
-            towers = {
-                'a': [],
-                'b': [],
-                'c': []
-            };
-            
-            disksA.innerHTML = '';
-            disksB.innerHTML = '';
-            disksC.innerHTML = '';
-            for (let i = diskCount; i >= 1; i--) {
-                const disk = createDisk(i);
-                disksA.appendChild(disk);
-                towers.a.push(i);
-            }
-            
-            moveCount = 0;
-            moveCounter.textContent = moveCount;
-            
-            // Calculate minimum moves
-            minMovesRequired = Math.pow(2, diskCount) - 1;
-            minMoves.textContent = minMovesRequired;
-            
-            // Reset selection
-            if (selectedTower) {
-                selectedTower.classList.remove('selected');
-                selectedTower = null;
-            }
-            
-            // Update status
-            statusText.textContent = 'Select a tower to pick up or place a disk';
-            
-            // Stop auto solve if running
-            stopAutoSolve();
+        // Fix the disk size representation
+// REPLACE this function
+function createDisk(size) {
+    const disk = document.createElement('div');
+    disk.classList.add('disk');
+    disk.dataset.size = size;
+    
+    // NEW WIDTH CALCULATION: Smaller size number = smaller disk
+    // For diskCount=3: size 1 (smallest) has width 60px, size 3 (largest) has width 100px
+    const width = 40 + size * 20;
+    disk.style.width = `${width}px`;
+    
+    // Alternate between light beige and black (carrom coins style)
+    const isEven = size % 2 === 0;
+    if (isEven) {
+        disk.style.backgroundColor = '#f5e8c9'; // Light beige
+        disk.style.color = '#000000';
+    } else {
+        disk.style.backgroundColor = '#222222'; // Black
+        disk.style.color = '#f5e8c9';
+    }
+    
+    // Add border and shadow effects
+    disk.style.border = isEven ? '2px solid #d4bc7d' : '2px solid #000000';
+    disk.style.boxShadow = isEven ? 
+        '0 4px 8px rgba(0,0,0,0.2), inset 0 0 10px rgba(212,188,125,0.3)' : 
+        '0 4px 8px rgba(0,0,0,0.5), inset 0 0 10px rgba(255,255,255,0.1)';
+    
+    // Add number to disk (visual representation only)
+    disk.textContent = size;
+    
+    // Add transition for smooth animations
+    disk.style.transition = 'all 0.5s ease, transform 0.3s ease, box-shadow 0.3s ease';
+    
+    return disk;
+}
 
-            // Hide win message if visible
-            winMessage.classList.remove('show');
+// REPLACE this function
+function initializeGame() {
+    // Reset towers
+    towers = {
+        'a': [],
+        'b': [],
+        'c': []
+    };
+    
+    // Clear disks visually
+    disksA.innerHTML = '';
+    disksB.innerHTML = '';
+    disksC.innerHTML = '';
+    
+    // FIXED: Create disks from largest to smallest
+    // Add disks to tower A with largest at bottom (should be arranged as diskCount...3,2,1)
+    for (let i = diskCount; i >= 1; i--) {
+        const disk = createDisk(i);
+        disksA.appendChild(disk);
+        towers.a.push(i);
+    }
+    
+    moveCount = 0;
+    moveCounter.textContent = moveCount;
+    
+    // Calculate minimum moves
+    minMovesRequired = Math.pow(2, diskCount) - 1;
+    minMoves.textContent = minMovesRequired;
+    
+    // Reset selection
+    if (selectedTower) {
+        selectedTower.classList.remove('selected');
+        selectedTower = null;
+    }
+    
+    // Update status
+    statusText.textContent = 'Select a tower to pick up or place a disk';
+    
+    // Stop auto solve if running
+    stopAutoSolve();
+
+    // Hide win message if visible
+    winMessage.classList.remove('show');
+}
+
+// REPLACE this function
+function handleTowerClick(towerId) {
+    // If auto-solving, don't allow manual moves
+    if (autoSolveInterval) return;
+    
+    const towerElement = document.getElementById(`tower-${towerId}`);
+    const towerDisks = towers[towerId];
+    
+    // If no tower is selected yet
+    if (!selectedTower) {
+        // Can only select a tower with disks
+        if (towerDisks.length === 0) {
+            statusText.textContent = 'Select a tower with disks';
+            towerElement.classList.add('invalid');
+            setTimeout(() => {
+                towerElement.classList.remove('invalid');
+            }, 500);
+            return;
         }
         
-        // Create a disk element
-        function createDisk(size) {
-            const disk = document.createElement('div');
-            disk.classList.add('disk');
-            disk.dataset.size = size;
-            
-            // Calculate width based on size (smaller number = bigger disk)
-            const width = 40 + (diskCount - size + 1) * 20;
-            disk.style.width = `${width}px`;
-            
-            // Alternate between light beige and black (carrom coins style)
-            const isEven = size % 2 === 0;
-            if (isEven) {
-                disk.style.backgroundColor = '#f5e8c9'; // Light beige
-                disk.style.color = '#000000';
-            } else {
-                disk.style.backgroundColor = '#222222'; // Black
-                disk.style.color = '#f5e8c9';
+        // Select this tower
+        selectedTower = towerElement;
+        selectedTower.classList.add('selected');
+        statusText.textContent = `Selected Tower ${towerId.toUpperCase()}. Now select a destination tower.`;
+        
+        // Animate the top disk
+        const topDiskElement = document.querySelector(`#disks-${towerId} .disk:last-child`);
+        if (topDiskElement) {
+            topDiskElement.classList.add('moving');
+        }
+    } 
+    // If a tower is already selected
+    else {
+        const selectedTowerId = selectedTower.id.split('-')[1];
+        
+        // If same tower is clicked again, deselect it
+        if (selectedTowerId === towerId) {
+            selectedTower.classList.remove('selected');
+            const topDiskElement = document.querySelector(`#disks-${towerId} .disk:last-child`);
+            if (topDiskElement) {
+                topDiskElement.classList.remove('moving');
             }
-            
-            // Add border and shadow effects
-            disk.style.border = isEven ? '2px solid #d4bc7d' : '2px solid #000000';
-            disk.style.boxShadow = isEven ? 
-                '0 4px 8px rgba(0,0,0,0.2), inset 0 0 10px rgba(212,188,125,0.3)' : 
-                '0 4px 8px rgba(0,0,0,0.5), inset 0 0 10px rgba(255,255,255,0.1)';
-            
-            // Add number to disk
-            disk.textContent = size;
-            
-            // Add transition for smooth animations
-            disk.style.transition = 'all 0.5s ease, transform 0.3s ease, box-shadow 0.3s ease';
-            
-            return disk;
+            selectedTower = null;
+            statusText.textContent = 'Select a tower to pick up or place a disk';
+            return;
         }
         
-        // Handle tower click
-        function handleTowerClick(towerId) {
-            // If auto-solving, don't allow manual moves
-            if (autoSolveInterval) return;
+        // Try to move disk
+        const sourceDisks = towers[selectedTowerId];
+        const targetDisks = towerDisks;
+        
+        // Check if move is valid
+        if (sourceDisks.length === 0) {
+            statusText.textContent = 'No disks to move!';
+            return;
+        }
+        
+        const diskToMove = sourceDisks[sourceDisks.length - 1];
+        const targetTopDisk = targetDisks.length > 0 ? targetDisks[targetDisks.length - 1] : Infinity;
+        
+        // FIXED RULE: In Tower of Hanoi, smaller disk value = smaller disk
+        // Valid move if disk to move is smaller than the top disk on target tower or target is empty
+        if (diskToMove < targetTopDisk) {
+            // Valid move - smaller disk can go on larger disk
+            moveDisk(selectedTowerId, towerId);
             
-            const towerElement = document.getElementById(`tower-${towerId}`);
-            const towerDisks = towers[towerId];
-            
-            // If no tower is selected yet
-            if (!selectedTower) {
-                // Can only select a tower with disks
-                if (towerDisks.length === 0) {
-                    statusText.textContent = 'Select a tower with disks';
-                    towerElement.classList.add('invalid');
-                    setTimeout(() => {
-                        towerElement.classList.remove('invalid');
-                    }, 500);
-                    return;
-                }
-                
-                // Select this tower
-                selectedTower = towerElement;
-                selectedTower.classList.add('selected');
-                statusText.textContent = `Selected Tower ${towerId.toUpperCase()}. Now select a destination tower.`;
-                
-                // Animate the top disk
-                const topDiskElement = document.querySelector(`#disks-${towerId} .disk:last-child`);
-                if (topDiskElement) {
-                    topDiskElement.classList.add('moving');
-                }
-            } 
-            // If a tower is already selected
-            else {
-                const selectedTowerId = selectedTower.id.split('-')[1];
-                
-                // If same tower is clicked again, deselect it
-                if (selectedTowerId === towerId) {
-                    selectedTower.classList.remove('selected');
-                    const topDiskElement = document.querySelector(`#disks-${towerId} .disk:last-child`);
-                    if (topDiskElement) {
-                        topDiskElement.classList.remove('moving');
-                    }
-                    selectedTower = null;
-                    statusText.textContent = 'Select a tower to pick up or place a disk';
-                    return;
-                }
-                
-                // Try to move disk
-                const sourceDisks = towers[selectedTowerId];
-                const targetDisks = towerDisks;
-                
-                // Check if move is valid
-                if (sourceDisks.length === 0) {
-                    statusText.textContent = 'No disks to move!';
-                    return;
-                }
-                
-                const diskToMove = sourceDisks[sourceDisks.length - 1];
-                const targetTopDisk = targetDisks.length > 0 ? targetDisks[targetDisks.length - 1] : Infinity;
-                
-                if (diskToMove < targetTopDisk) {
-                    // Valid move
-                    moveDisk(selectedTowerId, towerId);
-                    
-                    // Check if game is won
-                    if (towers.c.length === diskCount || towers.b.length === diskCount) {
-                        // Check if completed in minimum moves
-                        if (moveCount === minMovesRequired) {
-                            statusText.textContent = `Amazing! You completed the puzzle in the minimum ${moveCount} moves!`;
-                            celebrateWin();
-                        } else {
-                            statusText.textContent = `Congratulations! You completed the puzzle in ${moveCount} moves!`;
-                        }
-                    } else {
-                        statusText.textContent = 'Select a tower to pick up or place a disk';
-                    }
+            // Check if game is won
+            if (towers.c.length === diskCount || towers.b.length === diskCount) {
+                // Check if completed in minimum moves
+                if (moveCount === minMovesRequired) {
+                    statusText.textContent = `Amazing! You completed the puzzle in the minimum ${moveCount} moves!`;
+                    celebrateWin();
                 } else {
-                    statusText.textContent = 'Invalid move! You can only place smaller disks on top of larger ones.';
-                    towerElement.classList.add('invalid');
-                    setTimeout(() => {
-                        towerElement.classList.remove('invalid');
-                    }, 500);
+                    statusText.textContent = `Congratulations! You completed the puzzle in ${moveCount} moves!`;
                 }
-                
-                // Deselect tower
-                const topDiskElement = document.querySelector(`#disks-${selectedTowerId} .disk:last-child`);
-                if (topDiskElement) {
-                    topDiskElement.classList.remove('moving');
-                }
-                selectedTower.classList.remove('selected');
-                selectedTower = null;
+            } else {
+                statusText.textContent = 'Select a tower to pick up or place a disk';
             }
+        } else {
+            statusText.textContent = 'Invalid move! You cannot place a larger disk on top of a smaller disk.';
+            towerElement.classList.add('invalid');
+            setTimeout(() => {
+                towerElement.classList.remove('invalid');
+            }, 500);
         }
         
+        // Deselect tower
+        const topDiskElement = document.querySelector(`#disks-${selectedTowerId} .disk:last-child`);
+        if (topDiskElement) {
+            topDiskElement.classList.remove('moving');
+        }
+        selectedTower.classList.remove('selected');
+        selectedTower = null;
+    }
+}
         // Move disk from one tower to another
         function moveDisk(fromTower, toTower) {
             // Get the top disk from source tower
@@ -753,48 +809,50 @@
             confetti.style.animation = `confettiFall ${duration}s linear forwards`;
             
             // Add to body
+            // Add to body
             document.body.appendChild(confetti);
             
-            // Remove after animation
+            // Remove after animation completes
             setTimeout(() => {
                 confetti.remove();
             }, duration * 1000);
         }
-
+        
         // Celebrate win with confetti and message
         function celebrateWin() {
-            // Show win message if completed in minimum moves
-            if (moveCount === minMovesRequired) {
-                winMessage.classList.add('show');
-                setTimeout(() => {
-                    winMessage.classList.remove('show');
-                }, 5000);
+            // Show win message
+            winMessage.classList.add('show');
+            
+            // Create multiple confetti
+            for (let i = 0; i < 100; i++) {
+                setTimeout(createConfetti, Math.random() * 2000);
             }
-
-            // Create confetti
-            for (let i = 0; i < 150; i++) {
-                setTimeout(() => {
-                    createConfetti();
-                }, i * 50);
-            }
+            
+            // Hide win message after delay
+            setTimeout(() => {
+                winMessage.classList.remove('show');
+            }, 5000);
         }
         
-        // Event listeners
-        towerA.addEventListener('click', () => handleTowerClick('a'));
-        towerB.addEventListener('click', () => handleTowerClick('b'));
-        towerC.addEventListener('click', () => handleTowerClick('c'));
+        // Initialize event listeners
+        function initEventListeners() {
+            towerA.addEventListener('click', () => handleTowerClick('a'));
+            towerB.addEventListener('click', () => handleTowerClick('b'));
+            towerC.addEventListener('click', () => handleTowerClick('c'));
+            
+            resetBtn.addEventListener('click', initializeGame);
+            solveBtn.addEventListener('click', startAutoSolve);
+            stopBtn.addEventListener('click', stopAutoSolve);
+            
+            diskCountSelect.addEventListener('change', () => {
+                diskCount = parseInt(diskCountSelect.value);
+                initializeGame();
+            });
+        }
         
-        resetBtn.addEventListener('click', initializeGame);
-        solveBtn.addEventListener('click', startAutoSolve);
-        stopBtn.addEventListener('click', stopAutoSolve);
-        
-        diskCountSelect.addEventListener('change', () => {
-            diskCount = parseInt(diskCountSelect.value);
-            initializeGame();
-        });
-        
-        // Initialize game on load
-        window.addEventListener('load', initializeGame);
+        // Initialize the game
+        initEventListeners();
+        initializeGame();
     </script>
 </body>
 </html>
